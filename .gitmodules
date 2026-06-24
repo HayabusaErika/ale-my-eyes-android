@@ -1,0 +1,3 @@
+[submodule "ale-core"]
+	path = ale-core
+	url = https://github.com/HayabusaErika/ale-my-eyes-core.git
