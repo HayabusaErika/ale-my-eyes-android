@@ -1,0 +1,62 @@
+import { Palette } from "std-widgets.slint";
+
+export global AppTheme {
+    in property <bool> high-contrast: false;
+    in property <length> base-font: 14px;
+}
+
+export component StatusDot inherits Rectangle {
+    in property <string> state: "ready";
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    background: root.state == "speaking" ? #28a745
+        : root.state == "processing" ? #ffc107
+        : root.state == "error" ? #dc3545
+        : root.state == "recording" ? #17a2b8
+        : Palette.border;
+}
+
+export component TagPill inherits Rectangle {
+    in property <string> label;
+    in property <brush> accent: Palette.accent-background;
+    height: 22px;
+    border-radius: 11px;
+    background: root.accent.transparentize(0.85);
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        alignment: center;
+        Text {
+            text: root.label;
+            font-size: AppTheme.base-font - 3px;
+            color: root.accent;
+        }
+    }
+}
+
+export component IconButton inherits Rectangle {
+    in property <string> icon;
+    in property <string> tooltip;
+    in property <bool> active: false;
+    callback clicked;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: touch.has-hover ? Palette.control-background : transparent;
+    accessible-label: root.tooltip;
+    accessible-role: button;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: root.icon;
+        font-size: 14px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: root.active ? Palette.accent-background : Palette.foreground;
+    }
+}

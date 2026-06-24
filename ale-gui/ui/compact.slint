@@ -1,0 +1,219 @@
+import { LineEdit, Button, Palette, StyleMetrics } from "std-widgets.slint";
+import { StatusDot, AppTheme } from "widgets.slint";
+
+export component CompactScreen inherits Rectangle {
+    in property <string> status-text: "初始化中...";
+    in property <string> status-type: "info";
+    in property <string> vad-state: "silent";
+    in property <string> transcription: "";
+    in property <string> ai-response: "";
+    in property <string> action-steps: "";
+    in property <bool> show-confirmation: false;
+    in property <string> confirmation-text: "";
+    in property <bool> is-busy: false;
+    in property <bool> engine-ready: false;
+    in property <int> session-tokens: 0;
+    in property <int> max-tokens-budget: 4000;
+    in property <string> text-input: "";
+
+    callback text-submitted(string);
+    callback confirm-action();
+    callback cancel-action();
+    callback open-settings();
+
+    background: Palette.background;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 4px;
+
+        // 状态行
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 4px;
+                StatusDot {
+                    state: root.vad-state == "speaking" ? "speaking"
+                        : root.is-busy ? "processing"
+                        : !root.engine-ready ? "error"
+                        : "ready";
+                }
+                Text {
+                    text: root.vad-state == "speaking" ? "说话中"
+                        : root.vad-state == "speech_ended" ? "处理中"
+                        : root.is-busy ? root.status-text
+                        : root.engine-ready ? "监听中" : root.status-text;
+                    font-size: AppTheme.base-font - 2px;
+                    color: Palette.foreground.transparentize(0.3);
+                    vertical-alignment: center;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 4px;
+                Text {
+                    text: "⚙";
+                    font-size: 14px;
+                    color: Palette.foreground.transparentize(0.4);
+                    vertical-alignment: center;
+                }
+                TouchArea {
+                    clicked => { root.open-settings(); }
+                }
+            }
+        }
+
+        // 转写区
+        if root.transcription != "" : Rectangle {
+            height: 22px;
+            background: Palette.alternate-background;
+            border-radius: 4px;
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                Text {
+                    text: "🎙 " + root.transcription;
+                    font-size: AppTheme.base-font - 2px;
+                    color: Palette.foreground;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // AI 回答区
+        Rectangle {
+            vertical-stretch: 1;
+            background: Palette.control-background;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: Palette.border;
+
+            VerticalLayout {
+                padding: 8px;
+
+                if root.ai-response == "" && root.action-steps == "" : Text {
+                    text: "等待语音指令...";
+                    font-size: AppTheme.base-font - 2px;
+                    color: Palette.foreground.transparentize(0.5);
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                if root.ai-response != "" : VerticalLayout {
+                    spacing: 4px;
+
+                    Text {
+                        text: root.ai-response;
+                        font-size: AppTheme.base-font - 2px;
+                        color: Palette.foreground;
+                        wrap: word-wrap;
+                        overflow: elide;
+                    }
+
+                    if root.action-steps != "" : Text {
+                        text: root.action-steps;
+                        font-size: AppTheme.base-font - 4px;
+                        color: Palette.accent-background;
+                        wrap: word-wrap;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+
+        // 确认对话框
+        if root.show-confirmation : HorizontalLayout {
+            spacing: 6px;
+            height: 28px;
+
+            Rectangle {
+                horizontal-stretch: 1;
+                background: Palette.accent-background.transparentize(0.9);
+                border-radius: 4px;
+                border-width: 1px;
+                border-color: Palette.accent-background;
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    Text {
+                        text: "⚠ " + root.confirmation-text;
+                        font-size: AppTheme.base-font - 3px;
+                        color: Palette.foreground;
+                        overflow: elide;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Button {
+                text: "确认";
+                clicked => { root.confirm-action(); }
+            }
+            Button {
+                text: "取消";
+                clicked => { root.cancel-action(); }
+            }
+        }
+
+        // 底部栏
+        HorizontalLayout {
+            spacing: 6px;
+            height: 28px;
+
+            Text {
+                text: "Token:" + root.session-tokens + "/" + root.max-tokens-budget;
+                font-size: AppTheme.base-font - 4px;
+                color: Palette.foreground.transparentize(0.5);
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+                background: Palette.control-background;
+                border-radius: 4px;
+                border-width: 1px;
+                border-color: Palette.border;
+
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 6px;
+
+                    LineEdit {
+                        text: root.text-input;
+                        placeholder-text: "打字提问...";
+                        font-size: AppTheme.base-font - 2px;
+                        accepted(text) => { root.text-submitted(text); }
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 28px;
+                height: 28px;
+                border-radius: 4px;
+                background: root.engine-ready ? Palette.accent-background : Palette.border;
+
+                Text {
+                    text: "📤";
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                TouchArea {
+                    clicked => {
+                        if (root.engine-ready) {
+                            root.text-submitted(root.text-input);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

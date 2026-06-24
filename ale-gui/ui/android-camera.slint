@@ -1,0 +1,270 @@
+import { LineEdit, Button, Palette } from "std-widgets.slint";
+import { StatusDot, AppTheme } from "widgets.slint";
+
+export component AndroidCameraScreen inherits Rectangle {
+    in property <string> status-text: "初始化中...";
+    in property <string> status-type: "info";
+    in property <string> vad-state: "silent";
+    in property <string> transcription: "";
+    in property <string> ai-response: "";
+    in property <string> action-steps: "";
+    in property <bool> show-confirmation: false;
+    in property <string> confirmation-text: "";
+    in property <bool> is-busy: false;
+    in property <bool> engine-ready: false;
+    in property <int> session-tokens: 0;
+    in property <int> max-tokens-budget: 4000;
+    in property <string> text-input: "";
+    in property <bool> camera-available: false;
+    in property <image> camera-frame;
+    in property <bool> camera-frame-ready: false;
+
+    callback text-submitted(string);
+    callback confirm-action();
+    callback cancel-action();
+    callback open-settings();
+
+    background: Palette.background;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+
+        HorizontalLayout {
+            height: 42px;
+            spacing: 10px;
+            alignment: space-between;
+
+            VerticalLayout {
+                spacing: 2px;
+
+                Text {
+                    text: "Ale, My Eyes!";
+                    font-size: AppTheme.base-font + 6px;
+                    font-weight: 700;
+                    color: Palette.foreground;
+                }
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    StatusDot {
+                        state: root.vad-state == "speaking" ? "speaking"
+                            : root.is-busy ? "processing"
+                            : !root.engine-ready ? "error"
+                            : "ready";
+                    }
+                    Text {
+                        text: root.vad-state == "speaking" ? "说话中"
+                            : root.vad-state == "speech_ended" ? "处理中"
+                            : root.is-busy ? root.status-text
+                            : root.engine-ready ? "监听中" : root.status-text;
+                        font-size: AppTheme.base-font - 1px;
+                        color: Palette.foreground.transparentize(0.25);
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 36px;
+                height: 36px;
+                border-radius: 18px;
+                background: settings-touch.has-hover ? Palette.control-background : Palette.alternate-background;
+
+                Text {
+                    text: "⚙";
+                    font-size: 18px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    color: Palette.foreground.transparentize(0.15);
+                }
+
+                settings-touch := TouchArea {
+                    clicked => { root.open-settings(); }
+                }
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+            min-height: 240px;
+            background: Palette.alternate-background;
+            border-radius: 20px;
+            border-width: 1px;
+            border-color: Palette.border;
+            clip: true;
+
+            if root.camera-frame-ready : Image {
+                source: root.camera-frame;
+                image-fit: cover;
+                width: parent.width;
+                height: parent.height;
+            }
+
+            if root.camera-frame-ready && !root.camera-available : Rectangle {
+                y: parent.height - self.height - 14px;
+                x: 14px;
+                width: parent.width - 28px;
+                height: 38px;
+                border-radius: 19px;
+                background: #000000.transparentize(0.35);
+
+                Text {
+                    text: "相机采集未接入，当前为预览链路测试画面";
+                    font-size: AppTheme.base-font - 2px;
+                    color: white;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            if !root.camera-frame-ready :
+            VerticalLayout {
+                padding: 18px;
+                spacing: 12px;
+                alignment: center;
+
+                Text {
+                    text: root.camera-available ? "相机已启动" : "相机暂不可用";
+                    font-size: AppTheme.base-font + 8px;
+                    font-weight: 700;
+                    color: root.camera-available ? Palette.accent-background : Palette.foreground;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: root.camera-available
+                        ? "提问时会捕获当前画面并发送给 AI。实时预览将在相机管线接入后显示。"
+                        : "当前 Android 相机采集尚未接通或权限不可用。你仍然可以使用语音或文字提问。";
+                    font-size: AppTheme.base-font;
+                    color: Palette.foreground.transparentize(0.25);
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        Rectangle {
+            min-height: 130px;
+            background: Palette.control-background;
+            border-radius: 16px;
+            border-width: 1px;
+            border-color: Palette.border;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+
+                if root.transcription != "" : Text {
+                    text: "🎙 " + root.transcription;
+                    font-size: AppTheme.base-font - 1px;
+                    color: Palette.foreground.transparentize(0.1);
+                    wrap: word-wrap;
+                    overflow: elide;
+                }
+
+                if root.ai-response == "" && root.action-steps == "" : Text {
+                    text: "对着画面说话，或在下方打字提问。";
+                    font-size: AppTheme.base-font;
+                    color: Palette.foreground.transparentize(0.45);
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                if root.ai-response != "" : Text {
+                    text: root.ai-response;
+                    font-size: AppTheme.base-font;
+                    color: Palette.foreground;
+                    wrap: word-wrap;
+                    overflow: elide;
+                }
+
+                if root.action-steps != "" : Text {
+                    text: root.action-steps;
+                    font-size: AppTheme.base-font - 2px;
+                    color: Palette.accent-background;
+                    wrap: word-wrap;
+                    overflow: elide;
+                }
+            }
+        }
+
+        if root.show-confirmation : HorizontalLayout {
+            spacing: 8px;
+            height: 36px;
+
+            Rectangle {
+                horizontal-stretch: 1;
+                background: Palette.accent-background.transparentize(0.9);
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: Palette.accent-background;
+
+                Text {
+                    text: "⚠ " + root.confirmation-text;
+                    font-size: AppTheme.base-font - 2px;
+                    color: Palette.foreground;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                    overflow: elide;
+                }
+            }
+
+            Button { text: "确认"; clicked => { root.confirm-action(); } }
+            Button { text: "取消"; clicked => { root.cancel-action(); } }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            height: 44px;
+
+            Text {
+                text: "Token " + root.session-tokens + "/" + root.max-tokens-budget;
+                font-size: AppTheme.base-font - 3px;
+                color: Palette.foreground.transparentize(0.45);
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+                background: Palette.control-background;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Palette.border;
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    LineEdit {
+                        text: root.text-input;
+                        placeholder-text: "打字提问...";
+                        font-size: AppTheme.base-font;
+                        accepted(text) => { root.text-submitted(text); }
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                border-radius: 22px;
+                background: root.engine-ready ? Palette.accent-background : Palette.border;
+
+                Text {
+                    text: "📤";
+                    font-size: 16px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                TouchArea {
+                    clicked => {
+                        if (root.engine-ready) {
+                            root.text-submitted(root.text-input);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
