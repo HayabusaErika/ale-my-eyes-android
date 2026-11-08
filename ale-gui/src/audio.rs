@@ -2,7 +2,10 @@ use std::io::Cursor;
 use std::sync::{Arc, Mutex as StdMutex};
 
 #[cfg(target_os = "android")]
-use oboe::{AudioInputCallback, AudioInputStreamSafe, AudioStream, DataCallbackResult, Mono};
+use oboe::{
+    AudioInputCallback, AudioInputStreamSafe, AudioStream, AudioStreamAsync, AudioStreamBase,
+    DataCallbackResult, Input, Mono,
+};
 
 const MAX_BUFFER_SECONDS: usize = 120;
 
@@ -51,7 +54,7 @@ pub struct Recorder {
     #[cfg(not(target_os = "android"))]
     stream: cpal::Stream,
     #[cfg(target_os = "android")]
-    stream: Option<AudioStream<RecorderCallback>>,
+    stream: Option<AudioStreamAsync<Input, RecorderCallback>>,
     samples: Arc<StdMutex<SampleBuffer>>,
     sample_rate: u32,
     channels: u16,
@@ -230,11 +233,11 @@ impl AudioInputCallback for RecorderCallback {
 
     fn on_audio_ready(
         &mut self,
-        _stream: &mut dyn AudioInputStreamSafe,
+        stream: &mut dyn AudioInputStreamSafe,
         frames: &[f32],
     ) -> DataCallbackResult {
         if let Ok(mut buffer) = self.samples.lock() {
-            buffer.push_samples(frames.iter().copied(), 48_000, 1);
+            buffer.push_samples(frames.iter().copied(), stream.get_sample_rate() as usize, 1);
         }
         DataCallbackResult::Continue
     }
@@ -305,12 +308,15 @@ mod tests {
         let mut buffer = SampleBuffer::default();
         let mut offset = 0;
 
-        buffer.push_samples([1.0, 2.0, 3.0, 4.0], 1, 1);
-        assert_eq!(buffer.samples_since(&mut offset), vec![1.0, 2.0, 3.0, 4.0]);
+        buffer.push_samples((1..=120).map(|n| n as f32), 1, 1);
+        assert_eq!(buffer.samples_since(&mut offset).len(), 120);
 
-        buffer.push_samples([5.0, 6.0], 1, 1);
-        assert_eq!(buffer.samples, vec![3.0, 4.0, 5.0, 6.0]);
-        assert_eq!(buffer.samples_since(&mut offset), vec![5.0, 6.0]);
+        buffer.push_samples([121.0, 122.0], 1, 1);
+        assert_eq!(
+            buffer.samples,
+            (3..=122).map(|n| n as f32).collect::<Vec<_>>()
+        );
+        assert_eq!(buffer.samples_since(&mut offset), vec![121.0, 122.0]);
     }
 
     #[test]
@@ -318,9 +324,9 @@ mod tests {
         let mut buffer = SampleBuffer::default();
         let mut offset = 0;
 
-        buffer.push_samples([1.0, 2.0, 3.0, 4.0, 5.0], 1, 1);
-
-        assert_eq!(buffer.samples, vec![2.0, 3.0, 4.0, 5.0]);
-        assert_eq!(buffer.samples_since(&mut offset), vec![2.0, 3.0, 4.0, 5.0]);
+        buffer.push_samples((1..=121).map(|n| n as f32), 1, 1);
+        let expected = (2..=121).map(|n| n as f32).collect::<Vec<_>>();
+        assert_eq!(buffer.samples, expected);
+        assert_eq!(buffer.samples_since(&mut offset), expected);
     }
 }

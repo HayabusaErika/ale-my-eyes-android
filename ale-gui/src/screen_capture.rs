@@ -105,10 +105,6 @@ impl ScreenCapture {
 
     /// 开始持续捕获
     pub fn start(&self) -> Result<()> {
-        if !self.stop_signal.start()? {
-            return Ok(());
-        }
-
         self.start_with_capture_fn(capture_primary_monitor)
     }
 
@@ -116,6 +112,9 @@ impl ScreenCapture {
     where
         F: Fn(f32) -> Result<ScreenFrame> + Send + 'static,
     {
+        if !self.stop_signal.start()? {
+            return Ok(());
+        }
         let latest_frame = self.latest_frame.clone();
         let stop_signal = self.stop_signal.clone();
         let interval = self.config.interval;

@@ -22,7 +22,8 @@ This repository contains the Android version of the Ale, My Eyes! application, i
 
 - Rust toolchain (stable)
 - Android NDK (version 27.3.13750724)
-- Java 17 (for Android SDK)
+- Java 17 or newer (for Android SDK)
+- Android SDK platform 35 and build-tools 35.0.0 (for Slint's Java helper)
 - cargo-apk: `cargo install cargo-apk`
 
 ### Build

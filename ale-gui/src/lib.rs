@@ -1,12 +1,13 @@
 pub mod audio;
 mod conversation;
+mod runtime;
+pub use runtime::with_async_runtime;
 pub mod file_picker;
 pub mod tts_player;
 
 #[cfg(target_os = "android")]
 mod android;
 
-#[cfg(target_os = "android")]
 pub mod camera;
 
 #[cfg(not(target_os = "android"))]
@@ -384,7 +385,7 @@ pub fn setup_app(app: &AppWindow) {
             let app_weak = app_weak.clone();
             spawn_local_task(async move {
                 let mut st = state.lock().await;
-                if let Some(plan) = st.pending_plan.take() {
+                if let Some(plan) = take_confirmed_plan(&mut st.pending_plan) {
                     #[cfg(not(target_os = "android"))]
                     {
                         if st.automation.is_none() {
@@ -787,6 +788,8 @@ fn config_from_app(app: &AppWindow, base: &AppConfig) -> AppConfig {
 }
 
 async fn create_engine() -> Result<(Arc<Mutex<AleEngine>>, AppConfig), String> {
+    #[cfg(target_os = "android")]
+    crate::android::ensure_permissions().await?;
     let engine = AleEngineFactory::create_default()
         .await
         .map_err(|error| error.to_string())?;
@@ -821,4 +824,30 @@ fn ensure_api_key(config: &AppConfig) -> Result<(), String> {
         return Err("API key 未配置".to_string());
     }
     Ok(())
+}
+
+// Only the user-confirmation callback consumes this plan. Taking it prevents replay.
+fn take_confirmed_plan(pending: &mut Option<ActionPlan>) -> Option<ActionPlan> {
+    pending.take().map(|mut plan| {
+        plan.requires_confirmation = false;
+        plan
+    })
+}
+
+#[cfg(test)]
+mod confirmation_tests {
+    use super::*;
+
+    #[test]
+    fn confirmation_authorizes_the_plan_once() {
+        let mut plan = ActionPlan::new("test".into());
+        plan.requires_confirmation = true;
+        let mut pending = Some(plan);
+        assert!(
+            !take_confirmed_plan(&mut pending)
+                .unwrap()
+                .requires_confirmation
+        );
+        assert!(take_confirmed_plan(&mut pending).is_none());
+    }
 }

@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-ale-core = { path = "../ale-core" }
+ale-core = { path = "../ale-core/ale-core" }
 hound = "3"
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -28,10 +28,11 @@ open = "5"
 
 # Android-only dependencies
 [target.'cfg(target_os = "android")'.dependencies]
-slint = { version = "1.16", features = ["backend-android-activity-06"] }
+slint = { version = "1.16", default-features = false, features = ["std", "compat-1-2", "backend-android-activity-06", "renderer-software"] }
 oboe = "0.6"
 jni = "0.21"
 ndk-context = "0.1"
+ndk-sys = { version = "0.6", features = ["media"] }
 
 [[bin]]
 name = "ale-gui"
